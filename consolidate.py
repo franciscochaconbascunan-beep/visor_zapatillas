@@ -16,10 +16,14 @@ from __future__ import annotations
 
 import csv
 import json
+import sys
 from datetime import date, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT / "scrapers"))
+import common  # noqa: E402
+
 DATA_DIR = ROOT / "data"
 DOCS_DATA = ROOT / "docs" / "data"
 DOCS_DATA.mkdir(parents=True, exist_ok=True)
@@ -72,7 +76,11 @@ def main() -> int:
     now_iso = datetime.now().isoformat(timespec="seconds")
 
     consolidated: dict[str, dict] = {}
+    descartados_marca = 0
     for r in raw:
+        if not common.brand_allowed(r.get("marca", ""), r.get("modelo", "")):
+            descartados_marca += 1
+            continue  # fuera del filtro de marcas (Adidas/Nike)
         key = f"{r['tienda']}|{r['sku']}"
         if key in consolidated:
             continue  # dedup global por tienda+sku
@@ -126,6 +134,7 @@ def main() -> int:
         "total": len(productos),
         "con_talla_44_5_45": sum(1 for p in productos if p["tiene_44_5_45"]),
         "por_tienda": por_tienda,
+        "marcas_filtro": sorted(common.BRAND_ALLOW),
         "productos": productos,
     }
     json_path = DOCS_DATA / "productos.json"
@@ -134,6 +143,8 @@ def main() -> int:
 
     FIRST_SEEN_PATH.write_text(json.dumps(first_seen, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    if common.BRAND_ALLOW:
+        print(f"  Filtro de marcas {sorted(common.BRAND_ALLOW)}: {descartados_marca} productos descartados")
     print(f"  Total consolidado: {len(productos)} | con talla 44.5/45: {payload['con_talla_44_5_45']}")
     print(f"  Por tienda: {por_tienda}")
     return 0

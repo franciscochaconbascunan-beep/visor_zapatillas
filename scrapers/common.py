@@ -40,6 +40,18 @@ DATA_DIR.mkdir(exist_ok=True)
 # Tallas objetivo del usuario. Se normalizan comas -> puntos antes de comparar.
 TARGET_SIZES = {"44.5", "45"}
 
+# Marcas permitidas en la base consolidada. Conjunto vacío = sin filtro (todas).
+# Para ampliar, agrega términos en minúscula, p.ej. {"adidas", "nike", "puma"}.
+BRAND_ALLOW = {"adidas", "nike"}
+
+
+def brand_allowed(marca: str, modelo: str = "") -> bool:
+    """True si el producto pasa el filtro de marcas (busca en marca y modelo)."""
+    if not BRAND_ALLOW:
+        return True
+    hay = f"{marca} {modelo}".lower()
+    return any(term in hay for term in BRAND_ALLOW)
+
 # Encabezados "de navegador real" para reducir bloqueos anti-bot.
 DEFAULT_HEADERS = {
     "User-Agent": (
