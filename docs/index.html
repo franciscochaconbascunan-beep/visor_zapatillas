@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Visor de Zapatillas · Chile</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --panel:#ffffff; --ink:#1d2430; --muted:#6b7686;
+    --line:#e6e8ee; --brand:#1f6feb; --brand-soft:#e8f0fe;
+    --ok:#1a7f37; --ok-soft:#e6f4ea; --warn:#b54708;
+    --falabella:#3aaa35; --ripley:#c10064; --paris:#123f8f;
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px;line-height:1.45}
+  a{color:inherit;text-decoration:none}
+
+  header.top{position:sticky;top:0;z-index:20;background:var(--panel);border-bottom:1px solid var(--line);
+    padding:12px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  header.top h1{font-size:17px;margin:0;font-weight:700;display:flex;align-items:center;gap:8px}
+  header.top .sub{color:var(--muted);font-size:12.5px}
+  .spacer{flex:1}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-size:12px;padding:4px 10px;border-radius:999px;background:#f0f2f5;color:var(--muted);
+    border:1px solid var(--line);font-weight:600}
+  .chip.fala{background:rgba(58,170,53,.12);color:var(--falabella);border-color:transparent}
+  .chip.rip{background:rgba(193,0,100,.10);color:var(--ripley);border-color:transparent}
+  .chip.par{background:rgba(18,63,143,.10);color:var(--paris);border-color:transparent}
+  .views{display:flex;background:#eef0f4;border-radius:10px;padding:3px}
+  .views button{border:0;background:transparent;padding:6px 12px;border-radius:8px;font-weight:600;
+    color:var(--muted);cursor:pointer;font-size:13px}
+  .views button.active{background:#fff;color:var(--ink);box-shadow:var(--shadow)}
+
+  .layout{display:grid;grid-template-columns:280px 1fr;gap:20px;padding:20px;align-items:start}
+  aside{position:sticky;top:70px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px;box-shadow:var(--shadow)}
+  aside h2{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 10px}
+  .field{margin-bottom:16px}
+  .field label{display:block;font-weight:600;font-size:12.5px;margin-bottom:6px}
+  input[type=text],input[type=number],select{width:100%;padding:8px 10px;border:1px solid var(--line);
+    border-radius:9px;font-size:13px;background:#fff;color:var(--ink)}
+  .row2{display:flex;gap:8px}
+  .checks{display:flex;flex-direction:column;gap:7px}
+  .checks label{display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer}
+  .toggle{display:flex;align-items:center;gap:9px;font-weight:600;cursor:pointer;font-size:13px}
+  .count-badge{margin-left:auto;font-size:11px;color:var(--muted);font-weight:600}
+  .btn-reset{width:100%;margin-top:4px;padding:8px;border:1px solid var(--line);background:#fff;border-radius:9px;
+    cursor:pointer;font-weight:600;color:var(--muted)}
+  .btn-reset:hover{background:#f7f8fa}
+
+  main{min-width:0}
+  .toolbar{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+  .result-count{font-weight:700}
+  .result-count small{color:var(--muted);font-weight:500}
+  .sort{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .sort select{width:auto}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
+    box-shadow:var(--shadow);display:flex;flex-direction:column;transition:transform .08s,box-shadow .08s}
+  .card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(16,24,40,.10)}
+  .thumb{aspect-ratio:1/1;background:#f7f8fa;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+  .thumb img{width:100%;height:100%;object-fit:contain}
+  .store-tag{position:absolute;top:8px;left:8px;font-size:11px;font-weight:700;color:#fff;padding:3px 8px;border-radius:6px}
+  .store-tag.fala{background:var(--falabella)} .store-tag.rip{background:var(--ripley)} .store-tag.par{background:var(--paris)}
+  .disc{position:absolute;top:8px;right:8px;background:#d61f2b;color:#fff;font-weight:700;font-size:12px;padding:3px 7px;border-radius:6px}
+  .size-flag{position:absolute;bottom:8px;left:8px;background:var(--ok-soft);color:var(--ok);font-weight:700;
+    font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid rgba(26,127,55,.25)}
+  .card .body{padding:11px 12px 13px;display:flex;flex-direction:column;gap:4px;flex:1}
+  .brand{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+  .model{font-size:13px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:34px}
+  .prices{margin-top:auto;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .valor{font-size:17px;font-weight:800}
+  .precio{font-size:12.5px;color:var(--muted);text-decoration:line-through}
+  .seller{font-size:11px;color:var(--muted)}
+  .card a.cta{display:block;text-align:center;padding:9px;background:var(--brand);color:#fff;font-weight:700;font-size:12.5px}
+  .card a.cta:hover{filter:brightness(1.05)}
+
+  table{width:100%;border-collapse:collapse;background:var(--panel);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);font-size:12.5px}
+  th,td{padding:9px 11px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{background:#fafbfc;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);position:sticky;top:64px}
+  td.model-cell{white-space:normal;max-width:280px;font-weight:600}
+  tr:hover td{background:#fafbff}
+  .tbl-store{font-weight:700} .tbl-store.fala{color:var(--falabella)} .tbl-store.rip{color:var(--ripley)} .tbl-store.par{color:var(--paris)}
+  .yes{color:var(--ok);font-weight:700}
+
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
+  .metric{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+  .metric .n{font-size:28px;font-weight:800}
+  .metric .l{color:var(--muted);font-size:12.5px;margin-top:2px}
+  .bars{margin-top:6px}
+  .bar-row{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:12px}
+  .bar{height:8px;border-radius:4px;flex:1;background:#eef0f4;overflow:hidden}
+  .bar > i{display:block;height:100%}
+
+  .empty{padding:60px 20px;text-align:center;color:var(--muted)}
+  footer{padding:16px 20px;color:var(--muted);font-size:11.5px;text-align:center}
+  .hide{display:none}
+  @media(max-width:820px){.layout{grid-template-columns:1fr}aside{position:static}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>👟 Visor de Zapatillas <span class="sub">· Chile</span></h1>
+  <div class="chips">
+    <span class="chip fala" data-store="Falabella">Falabella</span>
+    <span class="chip rip" data-store="Ripley">Ripley</span>
+    <span class="chip par" data-store="Paris">Paris</span>
+  </div>
+  <div class="spacer"></div>
+  <div class="views">
+    <button data-view="cards" class="active">Tarjetas</button>
+    <button data-view="table">Tabla</button>
+    <button data-view="metrics">Métricas</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside>
+    <h2>Filtros</h2>
+    <div class="field">
+      <label for="q">Buscar modelo / marca</label>
+      <input type="text" id="q" placeholder="Ej: adidas, running, air max…" />
+    </div>
+    <div class="field">
+      <label>Tienda</label>
+      <div class="checks" id="stores"></div>
+    </div>
+    <div class="field">
+      <label for="brand">Marca</label>
+      <select id="brand"><option value="">Todas</option></select>
+    </div>
+    <div class="field">
+      <label>Valor (precio final)</label>
+      <div class="row2">
+        <input type="number" id="pmin" placeholder="Mín $" min="0" />
+        <input type="number" id="pmax" placeholder="Máx $" min="0" />
+      </div>
+    </div>
+    <div class="field">
+      <label class="toggle"><input type="checkbox" id="onlySize" /> Solo talla 44.5 / 45 confirmada
+        <span class="count-badge" id="sizeCount"></span></label>
+    </div>
+    <div class="field">
+      <label class="toggle"><input type="checkbox" id="onlyDisc" /> Solo con descuento</label>
+    </div>
+    <button class="btn-reset" id="reset">Limpiar filtros</button>
+  </aside>
+
+  <main>
+    <div class="toolbar">
+      <div class="result-count" id="rc">…</div>
+      <div class="sort">
+        <span style="color:var(--muted)">Ordenar:</span>
+        <select id="sort">
+          <option value="rel">Relevancia (talla + descuento)</option>
+          <option value="pasc">Precio: menor a mayor</option>
+          <option value="pdesc">Precio: mayor a menor</option>
+          <option value="disc">Mayor descuento</option>
+          <option value="new">Más nuevos</option>
+        </select>
+      </div>
+    </div>
+    <div id="view-cards" class="grid"></div>
+    <div id="view-table" class="hide"></div>
+    <div id="view-metrics" class="hide"></div>
+    <div id="empty" class="empty hide">No hay productos que coincidan con los filtros.</div>
+  </main>
+</div>
+
+<footer id="foot">Cargando datos…</footer>
+
+<script>
+const CLP = n => (n==null||n==="") ? "—" : "$" + Number(n).toLocaleString("es-CL");
+const STORE_CLASS = {Falabella:"fala", Ripley:"rip", Paris:"par"};
+let DATA = [], META = {};
+
+const state = {
+  q:"", stores:new Set(["Falabella","Ripley","Paris"]), brand:"",
+  pmin:null, pmax:null, onlySize:false, onlyDisc:false, sort:"rel", view:"cards"
+};
+
+function esc(s){return (s||"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+async function load(){
+  try{
+    const res = await fetch("./data/productos.json", {cache:"no-store"});
+    const j = await res.json();
+    DATA = j.productos || [];
+    META = j;
+    buildFilters();
+    document.getElementById("foot").innerHTML =
+      `Base consolidada: <b>${j.total}</b> productos · ${Object.entries(j.por_tienda||{}).map(([k,v])=>`${k}: ${v}`).join(" · ")} · Actualizado ${new Date(j.generado).toLocaleString("es-CL")}`;
+    render();
+  }catch(e){
+    document.getElementById("foot").textContent = "No pude cargar los datos (data/productos.json).";
+    document.getElementById("rc").textContent = "Error cargando datos";
+  }
+}
+
+function buildFilters(){
+  // stores
+  const sc = document.getElementById("stores");
+  ["Falabella","Ripley","Paris"].forEach(s=>{
+    const id="st_"+s;
+    const wrap=document.createElement("label");
+    wrap.innerHTML=`<input type="checkbox" id="${id}" checked> ${s}
+      <span class="count-badge">${DATA.filter(p=>p.tienda===s).length}</span>`;
+    wrap.querySelector("input").addEventListener("change",e=>{
+      e.target.checked?state.stores.add(s):state.stores.delete(s); render();
+    });
+    sc.appendChild(wrap);
+  });
+  // brands
+  const brands=[...new Set(DATA.map(p=>p.marca).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const bsel=document.getElementById("brand");
+  brands.forEach(b=>{const o=document.createElement("option");o.value=b;o.textContent=b;bsel.appendChild(o);});
+  document.getElementById("sizeCount").textContent = DATA.filter(p=>p.tiene_44_5_45).length;
+}
+
+function pass(p){
+  if(!state.stores.has(p.tienda)) return false;
+  if(state.brand && p.marca!==state.brand) return false;
+  if(state.onlySize && !p.tiene_44_5_45) return false;
+  const val=p.precio_oferta;
+  if(state.pmin!=null && (val==null||val<state.pmin)) return false;
+  if(state.pmax!=null && (val==null||val>state.pmax)) return false;
+  if(state.onlyDisc && !(p.descuento_pct>0)) return false;
+  if(state.q){
+    const hay=(p.modelo+" "+p.marca).toLowerCase();
+    if(!state.q.toLowerCase().split(/\s+/).every(t=>hay.includes(t))) return false;
+  }
+  return true;
+}
+
+function sortList(list){
+  const v=state.sort;
+  const val=p=>p.precio_oferta==null?Infinity:p.precio_oferta;
+  if(v==="pasc") list.sort((a,b)=>val(a)-val(b));
+  else if(v==="pdesc") list.sort((a,b)=>val(b)-val(a));
+  else if(v==="disc") list.sort((a,b)=>(b.descuento_pct||0)-(a.descuento_pct||0));
+  else if(v==="new") list.sort((a,b)=>(b.fecha_publicacion||"").localeCompare(a.fecha_publicacion||""));
+  else list.sort((a,b)=>(b.tiene_44_5_45-a.tiene_44_5_45)||((b.descuento_pct||0)-(a.descuento_pct||0)));
+  return list;
+}
+
+function render(){
+  const list=sortList(DATA.filter(pass));
+  document.getElementById("rc").innerHTML=`${list.length} <small>de ${DATA.length} productos</small>`;
+  ["cards","table","metrics"].forEach(v=>{
+    document.getElementById("view-"+v).classList.toggle("hide", state.view!==v);
+  });
+  document.getElementById("empty").classList.toggle("hide", list.length>0 || state.view==="metrics");
+  if(state.view==="cards") renderCards(list);
+  else if(state.view==="table") renderTable(list);
+  else renderMetrics(list);
+}
+
+function renderCards(list){
+  const el=document.getElementById("view-cards");
+  el.innerHTML=list.map(p=>{
+    const cls=STORE_CLASS[p.tienda]||"";
+    const disc=p.descuento_pct>0?`<span class="disc">-${p.descuento_pct}%</span>`:"";
+    const size=p.tiene_44_5_45?`<span class="size-flag">Talla 44.5/45 ✓</span>`:"";
+    const normal=(p.precio_normal&&p.precio_normal!==p.precio_oferta)?`<span class="precio">${CLP(p.precio_normal)}</span>`:"";
+    const img=p.imagen?`<img src="${esc(p.imagen)}" loading="lazy" alt="">`:"👟";
+    return `<div class="card">
+      <div class="thumb"><span class="store-tag ${cls}">${p.tienda}</span>${disc}${img}${size}</div>
+      <div class="body">
+        <div class="brand">${esc(p.marca||"·")}</div>
+        <div class="model">${esc(p.modelo)}</div>
+        <div class="prices"><span class="valor">${CLP(p.precio_oferta)}</span>${normal}</div>
+        <div class="seller">${esc(p.vendedor||p.tienda)}</div>
+      </div>
+      <a class="cta" href="${esc(p.link)}" target="_blank" rel="noopener">Ver aviso →</a>
+    </div>`;
+  }).join("");
+}
+
+function renderTable(list){
+  const el=document.getElementById("view-table");
+  el.classList.remove("hide");
+  const rows=list.map(p=>`<tr>
+    <td>${CLP(p.precio_normal)}</td>
+    <td>${esc(p.talla||"s/info")}</td>
+    <td><b>${CLP(p.precio_oferta)}</b></td>
+    <td class="model-cell">${esc(p.modelo)}</td>
+    <td class="tbl-store ${STORE_CLASS[p.tienda]}">${p.tienda}</td>
+    <td>${esc(p.marca)}</td>
+    <td>${p.descuento_pct?("-"+p.descuento_pct+"%"):"—"}</td>
+    <td class="${p.tiene_44_5_45?'yes':''}">${p.tiene_44_5_45?"Sí":"—"}</td>
+    <td>${esc(p.fecha_publicacion||"")}</td>
+    <td><a href="${esc(p.link)}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:700">Ver →</a></td>
+  </tr>`).join("");
+  el.innerHTML=`<table><thead><tr>
+    <th>Precio</th><th>Talla</th><th>Valor</th><th>Modelo</th><th>Tienda</th><th>Marca</th>
+    <th>Desc.</th><th>44.5/45</th><th>Publicado</th><th>Link</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderMetrics(list){
+  const el=document.getElementById("view-metrics");
+  const valores=list.map(p=>p.precio_oferta).filter(v=>v!=null);
+  const min=valores.length?Math.min(...valores):null;
+  const avg=valores.length?Math.round(valores.reduce((a,b)=>a+b,0)/valores.length):null;
+  const conTalla=list.filter(p=>p.tiene_44_5_45).length;
+  const porTienda={};list.forEach(p=>porTienda[p.tienda]=(porTienda[p.tienda]||0)+1);
+  const max=Math.max(1,...Object.values(porTienda));
+  const col={Falabella:"var(--falabella)",Ripley:"var(--ripley)",Paris:"var(--paris)"};
+  el.innerHTML=`<div class="metrics">
+    <div class="metric"><div class="n">${list.length}</div><div class="l">Productos (filtrados)</div></div>
+    <div class="metric"><div class="n">${conTalla}</div><div class="l">Con talla 44.5/45 confirmada</div></div>
+    <div class="metric"><div class="n">${CLP(min)}</div><div class="l">Precio (valor) más bajo</div></div>
+    <div class="metric"><div class="n">${CLP(avg)}</div><div class="l">Precio (valor) promedio</div></div>
+    <div class="metric" style="grid-column:1/-1">
+      <div class="l" style="margin-bottom:8px;font-weight:700;color:var(--ink)">Distribución por tienda</div>
+      <div class="bars">${Object.entries(porTienda).map(([k,v])=>`
+        <div class="bar-row"><span style="width:80px;font-weight:600">${k}</span>
+        <span class="bar"><i style="width:${v/max*100}%;background:${col[k]||'#888'}"></i></span>
+        <b>${v}</b></div>`).join("")}</div>
+    </div>
+  </div>`;
+}
+
+// ---- eventos ----
+const on=(id,ev,fn)=>document.getElementById(id).addEventListener(ev,fn);
+on("q","input",e=>{state.q=e.target.value;render();});
+on("brand","change",e=>{state.brand=e.target.value;render();});
+on("pmin","input",e=>{state.pmin=e.target.value?+e.target.value:null;render();});
+on("pmax","input",e=>{state.pmax=e.target.value?+e.target.value:null;render();});
+on("onlySize","change",e=>{state.onlySize=e.target.checked;render();});
+on("onlyDisc","change",e=>{state.onlyDisc=e.target.checked;render();});
+on("sort","change",e=>{state.sort=e.target.value;render();});
+document.querySelectorAll(".views button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".views button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");state.view=b.dataset.view;render();
+}));
+on("reset","click",()=>{
+  state.q="";state.brand="";state.pmin=null;state.pmax=null;state.onlySize=false;state.onlyDisc=false;
+  document.getElementById("q").value="";document.getElementById("brand").value="";
+  document.getElementById("pmin").value="";document.getElementById("pmax").value="";
+  document.getElementById("onlySize").checked=false;document.getElementById("onlyDisc").checked=false;
+  state.stores=new Set(["Falabella","Ripley","Paris"]);
+  document.querySelectorAll("#stores input").forEach(c=>c.checked=true);
+  render();
+});
+document.querySelectorAll(".chip[data-store]").forEach(c=>c.addEventListener("click",()=>{
+  state.stores=new Set([c.dataset.store]);
+  document.querySelectorAll("#stores input").forEach(inp=>{
+    inp.checked = inp.id==="st_"+c.dataset.store;
+  });
+  render();
+}));
+
+load();
+</script>
+</body>
+</html>

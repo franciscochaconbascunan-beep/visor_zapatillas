@@ -1,0 +1,3 @@
+requests>=2.31
+# Plan B para Paris si algún día su JSON-LD deja de servir (no requerido por defecto):
+# playwright>=1.44

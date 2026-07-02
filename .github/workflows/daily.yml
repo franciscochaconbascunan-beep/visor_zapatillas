@@ -1,0 +1,57 @@
+name: Actualizar zapatillas (diario)
+
+on:
+  schedule:
+    # 12:00 UTC = ~08:00 en Chile. Corre todos los días.
+    - cron: "0 12 * * *"
+  workflow_dispatch: {}   # permite ejecutarlo manualmente desde la pestaña Actions
+
+permissions:
+  contents: write
+
+concurrency:
+  group: scrape-zapatillas
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      # Cada tienda por separado: si una falla, las otras siguen (se conserva su último crudo).
+      - name: Scraper Falabella
+        run: python scrapers/falabella.py
+        continue-on-error: true
+
+      - name: Scraper Ripley
+        run: python scrapers/ripley.py
+        continue-on-error: true
+
+      - name: Scraper Paris
+        run: python scrapers/paris.py
+        continue-on-error: true
+
+      - name: Consolidar
+        run: python consolidate.py
+
+      - name: Commit de datos actualizados
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/ docs/data/
+          if git diff --cached --quiet; then
+            echo "Sin cambios en los datos."
+          else
+            git commit -m "Actualización automática de zapatillas ($(date -u +%Y-%m-%d)) [skip ci]"
+            git push
+          fi
