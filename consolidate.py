@@ -3,12 +3,17 @@ Consolida los crudos de las tres tiendas (data/raw_*.json) en:
   - data/consolidado.csv          (base homologada, lista para Excel)
   - docs/data/productos.json      (lo que consume el visor web)
 
-Columnas de la base consolidada (en el orden pedido + extras relevantes):
+Columnas de la base consolidada (en el orden pedido + extras):
   Precio | Talla | Valor | Modelo | Link | Fecha_publicacion | Tienda
-  + Marca | Descuento_% | Tiene_44.5/45 | Vendedor | SKU | Imagen | Disponible | Fecha_actualizacion
+  + Marca | Descuento_% | Tiene_44.5/45 | Vendedor | SKU | Imagen | Disponible
+  + Fecha_actualizacion
+  + Precio_min_historico | Fecha_min_historico | Precio_anterior | Variacion_$
+  + Es_minimo_historico | Dias_seguimiento | Modelo_clave
 
-"Fecha_publicacion" es un proxy: la PRIMERA fecha en que detectamos el producto
-(persistida en data/first_seen.json), porque el retail no expone fecha real de aviso.
+Persistencia entre corridas:
+  - data/first_seen.json        -> primera fecha vista (proxy de "fecha de publicación")
+  - data/historial_precios.json -> serie {fecha, valor} por producto, para ver la
+    evolución del precio en el tiempo. Se construye HACIA ADELANTE (desde hoy).
 
 Uso:  python consolidate.py
 """
@@ -30,12 +35,25 @@ DOCS_DATA.mkdir(parents=True, exist_ok=True)
 
 STORES = ["falabella", "ripley", "paris"]
 FIRST_SEEN_PATH = DATA_DIR / "first_seen.json"
+HIST_PATH = DATA_DIR / "historial_precios.json"
+HIST_MAX = 60  # máximo de puntos de historial que se guardan por producto
 
 CSV_COLUMNS = [
     "Precio", "Talla", "Valor", "Modelo", "Link", "Fecha_publicacion", "Tienda",
     "Marca", "Descuento_%", "Tiene_44.5/45", "Vendedor", "SKU", "Imagen",
     "Disponible", "Fecha_actualizacion",
+    "Precio_min_historico", "Fecha_min_historico", "Precio_anterior",
+    "Variacion_$", "Es_minimo_historico", "Dias_seguimiento", "Modelo_clave",
 ]
+
+
+def load_json(path: Path, default):
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            return default
+    return default
 
 
 def load_raw() -> list[dict]:
@@ -55,13 +73,45 @@ def load_raw() -> list[dict]:
     return records
 
 
-def load_first_seen() -> dict:
-    if FIRST_SEEN_PATH.exists():
-        try:
-            return json.loads(FIRST_SEEN_PATH.read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001
-            return {}
-    return {}
+def update_history(entries: list[dict], valor, today: str) -> list[dict]:
+    """Agrega hoy a la serie solo si el precio cambió respecto al último punto."""
+    if valor is None:
+        return entries
+    if not entries or entries[-1]["v"] != valor:
+        entries = entries + [{"f": today, "v": valor}]
+    return entries[-HIST_MAX:]
+
+
+def derive_history_fields(entries: list[dict], valor, today: str) -> dict:
+    valores = [e["v"] for e in entries]
+    if not valores:
+        return {
+            "precio_min_hist": valor, "fecha_min_hist": today,
+            "precio_max_hist": valor, "precio_anterior": None,
+            "variacion": None, "es_minimo_historico": False,
+            "historial_suficiente": False, "dias_seguimiento": 0,
+            "historial": [],
+        }
+    pmin = min(valores)
+    fecha_min = entries[valores.index(pmin)]["f"]
+    precio_anterior = valores[-2] if len(valores) >= 2 else None
+    variacion = (valor - precio_anterior) if (valor is not None and precio_anterior is not None) else None
+    suficiente = len(valores) >= 2
+    try:
+        dias = (date.fromisoformat(today) - date.fromisoformat(entries[0]["f"])).days
+    except Exception:  # noqa: BLE001
+        dias = 0
+    return {
+        "precio_min_hist": pmin,
+        "fecha_min_hist": fecha_min,
+        "precio_max_hist": max(valores),
+        "precio_anterior": precio_anterior,
+        "variacion": variacion,
+        "es_minimo_historico": bool(valor is not None and suficiente and valor <= pmin),
+        "historial_suficiente": suficiente,
+        "dias_seguimiento": dias,
+        "historial": entries,
+    }
 
 
 def main() -> int:
@@ -71,7 +121,8 @@ def main() -> int:
         print("  No hay datos crudos. Corre primero los scrapers.")
         return 1
 
-    first_seen = load_first_seen()
+    first_seen = load_json(FIRST_SEEN_PATH, {})
+    historial = load_json(HIST_PATH, {})
     today = date.today().isoformat()
     now_iso = datetime.now().isoformat(timespec="seconds")
 
@@ -86,19 +137,27 @@ def main() -> int:
             continue  # dedup global por tienda+sku
         if key not in first_seen:
             first_seen[key] = today
+
+        valor = r.get("precio_oferta")
+        historial[key] = update_history(historial.get(key, []), valor, today)
+        hist_fields = derive_history_fields(historial[key], valor, today)
+
         tallas = r.get("tallas_disponibles") or []
-        talla_str = ", ".join(tallas) if tallas else "s/info"
         producto = {
             **r,
-            "talla": talla_str,
+            "talla": ", ".join(tallas) if tallas else "s/info",
             "fecha_publicacion": first_seen[key],
             "fecha_actualizacion": now_iso,
+            "modelo_clave": common.modelo_clave(r.get("marca", ""), r.get("modelo", "")),
+            **hist_fields,
         }
         consolidated[key] = producto
 
     productos = list(consolidated.values())
-    # Orden por defecto: primero los que confirman talla, luego mayor descuento.
-    productos.sort(key=lambda p: (not p["tiene_44_5_45"], -(p.get("descuento_pct") or 0)))
+    # Orden por defecto: talla confirmada, luego mínimo histórico, luego mayor descuento.
+    productos.sort(key=lambda p: (
+        not p["tiene_44_5_45"], not p["es_minimo_historico"], -(p.get("descuento_pct") or 0)
+    ))
 
     # ---- CSV consolidado ----
     csv_path = DATA_DIR / "consolidado.csv"
@@ -107,21 +166,17 @@ def main() -> int:
         w.writerow(CSV_COLUMNS)
         for p in productos:
             w.writerow([
-                p.get("precio_normal", ""),
-                p.get("talla", ""),
-                p.get("precio_oferta", ""),
-                p.get("modelo", ""),
-                p.get("link", ""),
-                p.get("fecha_publicacion", ""),
-                p.get("tienda", ""),
-                p.get("marca", ""),
-                p.get("descuento_pct", ""),
-                "Si" if p.get("tiene_44_5_45") else "No",
-                p.get("vendedor", ""),
-                p.get("sku", ""),
-                p.get("imagen", ""),
-                "Si" if p.get("disponible") else "No",
+                p.get("precio_normal", ""), p.get("talla", ""), p.get("precio_oferta", ""),
+                p.get("modelo", ""), p.get("link", ""), p.get("fecha_publicacion", ""),
+                p.get("tienda", ""), p.get("marca", ""), p.get("descuento_pct", ""),
+                "Si" if p.get("tiene_44_5_45") else "No", p.get("vendedor", ""),
+                p.get("sku", ""), p.get("imagen", ""), "Si" if p.get("disponible") else "No",
                 p.get("fecha_actualizacion", ""),
+                p.get("precio_min_hist", ""), p.get("fecha_min_hist", ""),
+                p.get("precio_anterior", "") if p.get("precio_anterior") is not None else "",
+                p.get("variacion", "") if p.get("variacion") is not None else "",
+                "Si" if p.get("es_minimo_historico") else "No",
+                p.get("dias_seguimiento", 0), p.get("modelo_clave", "") or "",
             ])
     print(f"  CSV -> {csv_path.relative_to(ROOT)} ({len(productos)} filas)")
 
@@ -133,6 +188,7 @@ def main() -> int:
         "generado": now_iso,
         "total": len(productos),
         "con_talla_44_5_45": sum(1 for p in productos if p["tiene_44_5_45"]),
+        "en_minimo_historico": sum(1 for p in productos if p["es_minimo_historico"]),
         "por_tienda": por_tienda,
         "marcas_filtro": sorted(common.BRAND_ALLOW),
         "productos": productos,
@@ -142,10 +198,13 @@ def main() -> int:
     print(f"  JSON -> {json_path.relative_to(ROOT)}")
 
     FIRST_SEEN_PATH.write_text(json.dumps(first_seen, ensure_ascii=False, indent=2), encoding="utf-8")
+    HIST_PATH.write_text(json.dumps(historial, ensure_ascii=False), encoding="utf-8")
 
     if common.BRAND_ALLOW:
-        print(f"  Filtro de marcas {sorted(common.BRAND_ALLOW)}: {descartados_marca} productos descartados")
-    print(f"  Total consolidado: {len(productos)} | con talla 44.5/45: {payload['con_talla_44_5_45']}")
+        print(f"  Filtro de marcas {sorted(common.BRAND_ALLOW)}: {descartados_marca} descartados")
+    print(f"  Total: {len(productos)} | talla 44.5/45: {payload['con_talla_44_5_45']}"
+          f" | en mínimo histórico: {payload['en_minimo_historico']}")
+    print(f"  Historial: {len(historial)} productos siguiendo precio")
     print(f"  Por tienda: {por_tienda}")
     return 0
 

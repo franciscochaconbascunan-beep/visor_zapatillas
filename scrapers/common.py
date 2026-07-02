@@ -127,6 +127,51 @@ def slugify(text: str) -> str:
     return text
 
 
+def _strip_accents(text: str) -> str:
+    return unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode()
+
+
+# Palabras genéricas y colores que NO identifican un modelo (se ignoran al comparar).
+_STOPWORDS = {
+    "zapatilla", "zapatillas", "zapato", "zapatos", "calzado", "tenis",
+    "hombre", "hombres", "mujer", "mujeres", "unisex", "nino", "ninos", "nina", "ninas",
+    "urbana", "urbano", "urbanas", "urbanos", "running", "deportiva", "deportivas",
+    "deportivo", "training", "casual", "lifestyle", "sportswear", "originals",
+    "para", "de", "con", "talla", "u", "para", "the",
+}
+_COLORS = {
+    "negro", "negra", "negros", "negras", "blanco", "blanca", "blancos", "blancas",
+    "gris", "grises", "azul", "azules", "rojo", "roja", "verde", "amarillo", "amarilla",
+    "rosado", "rosada", "rosa", "morado", "morada", "naranjo", "naranja", "cafe",
+    "beige", "celeste", "plomo", "multicolor", "dorado", "dorada", "plateado", "plateada",
+    "fucsia", "lila", "turquesa", "crema", "vino", "marino", "petroleo", "coral",
+}
+
+
+def modelo_clave(marca: str, modelo: str) -> str | None:
+    """
+    Firma normalizada del modelo, para emparejar el MISMO producto entre tiendas.
+    Ej: ('ADIDAS','Zapatillas Running Galaxy Star 2.0 Hombre Rojo') -> 'adidas|2.0 galaxy star'.
+    Devuelve None si no queda señal suficiente (no se puede comparar con confianza).
+    """
+    brand = _strip_accents(marca).lower().strip()
+    text = _strip_accents(modelo).lower()
+    text = re.sub(r"[^a-z0-9. ]+", " ", text)
+    brand_tokens = set(brand.split())
+    kept = []
+    for tok in text.split():
+        tok = tok.strip(".")
+        if not tok or tok in brand_tokens or tok in _STOPWORDS or tok in _COLORS:
+            continue
+        if len(tok) == 1 and not tok.isdigit():
+            continue
+        kept.append(tok)
+    if not kept:
+        return None
+    sig = " ".join(sorted(set(kept)))
+    return f"{brand}|{sig}" if brand else sig
+
+
 def make_record(
     *,
     tienda: str,

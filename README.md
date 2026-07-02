@@ -35,11 +35,26 @@ data/             Crudos por tienda, base consolidada y first_seen.json
 
 `Precio` (normal/lista) · `Talla` · `Valor` (precio final que pagas) · `Modelo` ·
 `Link` · `Fecha_publicacion` · `Tienda` · `Marca` · `Descuento_%` · `Tiene_44.5/45` ·
-`Vendedor` · `SKU` · `Imagen` · `Disponible` · `Fecha_actualizacion`
+`Vendedor` · `SKU` · `Imagen` · `Disponible` · `Fecha_actualizacion` ·
+`Precio_min_historico` · `Fecha_min_historico` · `Precio_anterior` · `Variacion_$` ·
+`Es_minimo_historico` · `Dias_seguimiento` · `Modelo_clave`
 
 > **Precio vs Valor:** `Precio` = precio normal tachado; `Valor` = precio de oferta/actual.
 > **Fecha_publicacion:** el retail no expone la fecha real del aviso, así que se usa como
 > proxy la **primera fecha en que detectamos el producto** (persistida en `data/first_seen.json`).
+
+## Funciones del visor
+
+- **Historial de precios:** cada corrida guarda la serie `{fecha, valor}` por producto en
+  `data/historial_precios.json` y calcula mínimo histórico, precio anterior, variación y un
+  mini-gráfico. Detecta ofertas *reales* (badge **🔥 Mínimo histórico**). Se construye **hacia
+  adelante**: acumula desde el día que se activó, no recupera precios pasados.
+- **Comparar tiendas:** la vista *Comparar* empareja el **mismo modelo** entre Falabella, Ripley
+  y Paris (heurística por marca + tokens del nombre, campo `Modelo_clave`), resalta la tienda más
+  barata y muestra el ahorro potencial. El emparejamiento es aproximado: siempre puedes abrir cada
+  aviso para confirmar que es el mismo producto.
+- Filtros: tienda, marca, rango de precio, talla 44.5/45, descuento; vistas Tarjetas / Tabla /
+  Comparar / Métricas.
 
 ## Correr localmente
 
